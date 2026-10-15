@@ -1730,10 +1730,7 @@ if __name__ == "__main__":
 
     # Main loop
     for i, row in enumerate(table):
-           
-        if row["Source_Name"] != "ILTJ135720.67+400405.0":
-            continue
-
+      
         # Skip already-processed rows 
         # if ('Pint/Pext1' in row.colnames and
         #     np.isfinite(row['Pint/Pext1']) and (row['Pint/Pext1'] != 0)):
