@@ -86,30 +86,62 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
     6) step6_region_fits.pdf - shows segment geometry (widths, heights) through rectangles (couldn't plot 3d cylinder, use this as proxy)
     7) step7_pressure_ratios.pdf - shows ridge, host, 3 segments (as rectangles), pressure ratio labelled in each segment
     """
+    FS = 22
+    TICKFS = 20
+    # crop to source
+    finite_mask = np.isfinite(image)
 
+    ys_all, xs_all = np.nonzero(finite_mask)
+    
+    pad = 10
+    
+    ymin = max(ys_all.min() - pad, 0)
+    ymax = min(ys_all.max() + pad, image.shape[0])
+    
+    xmin = max(xs_all.min() - pad, 0)
+    xmax = min(xs_all.max() + pad, image.shape[1])
+    
     def setup_axes():
-        fig = plt.figure(figsize=(8,8))
+    
+    
+        fig = plt.figure(figsize=(10,10))
         ax = fig.add_subplot(111, projection=wcs_cutout)
-
+    
         vmin = np.nanpercentile(image, 5)
         vmax = np.nanpercentile(image, 99)
-
+        fig.subplots_adjust(left=0.12,right=0.92, bottom=0.12,top=0.95)
+        
         ax.imshow(
             image,
             origin='lower',
             norm=LogNorm(vmin=vmin, vmax=vmax),
             cmap='inferno'
         )
-
-        ax.coords[0].set_axislabel("RA (J2000)")
-        ax.coords[1].set_axislabel("DEC (J2000)")
+    
+        
+    
+        ax.set_xlim(xmin,xmax)
+    
+        ax.set_ylim(ymin,ymax)
+    
+        ax.coords[0].set_axislabel(
+            "RA (J2000)",
+            fontsize=FS
+        )
+    
+        ax.coords[1].set_axislabel(
+            "DEC (J2000)",
+            fontsize=FS
+        )
+    
         ax.coords[0].set_major_formatter('hh:mm:ss')
         ax.coords[1].set_major_formatter('dd:mm:ss')
-
+    
+        ax.coords[0].set_ticklabel(size=TICKFS)
+        ax.coords[1].set_ticklabel(size=TICKFS)
+    
         return fig, ax
-
-
-    # plot 1
+        # plot 1
     
 
     fig, ax = setup_axes()
@@ -140,15 +172,13 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
         label='Chosen end'
     )
 
-    ax.legend()
+    ax.legend(fontsize=FS)
    # ax.set_title(f"{source}: host and spline")
 
     plt.savefig(
         f"{out_dir}/{source}_geometry_step1_ridge.pdf",
-        bbox_inches='tight'
-    )
-    print(
-        f"{out_dir}/{source}_geometry_step1_ridge.pdf")
+        bbox_inches='tight')
+   
     plt.close()
 
     # plot 2 
@@ -163,7 +193,7 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
         yy_mask,
         c='cyan',
         s=2,
-        alpha=0.3,
+        alpha=0.5,
         transform=ax.get_transform("pixel"),label='Chosen end'
     )
 
@@ -183,11 +213,10 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
         transform=ax.get_transform("pixel"),label='Host')
 
     #ax.set_title(f"{source}: selected-side pixels")
-    ax.legend()
+    ax.legend(fontsize=FS)
     plt.savefig(
         f"{out_dir}/{source}_geometry_step2_side_selection.pdf",
-        bbox_inches='tight'
-    )
+        bbox_inches='tight')
     plt.close()
 
 
@@ -218,7 +247,7 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
             label=f"Deconvolved width = {width_kpc_deconvolved:.1f} kpc"
         )
 
-        ax.legend()
+        ax.legend(fontsize=FS)
 
   #  ax.set_title(f"{source}: width measurement")
 
@@ -232,7 +261,7 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
     # plot 4 
     
     fig, ax = setup_axes()
-
+    fig.subplots_adjust(right=0.82)
     sc = ax.scatter(
         xs,
         ys,
@@ -242,11 +271,16 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
         transform=ax.get_transform("pixel")
     )
 
-    plt.colorbar(
+    cbar=plt.colorbar(
         sc,
         ax=ax,
-        label="Normalised distance along ridge"
+        fraction=0.046,
+        pad=0,
+        shrink=0.85
     )
+
+    cbar.set_label("Normalised distance along ridge",fontsize=FS)
+    cbar.ax.tick_params(labelsize=TICKFS)
 
     #ax.set_title(f"{source}: u_ridge mapping")
 
@@ -287,11 +321,10 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
     )
 
   #  ax.set_title(f"{source}: pressure segments")
-    ax.legend()
+    ax.legend(fontsize=FS)
     plt.savefig(
         f"{out_dir}/{source}_geometry_step5_segments.pdf",
-        bbox_inches='tight'
-    )
+        bbox_inches='tight')
     plt.close()
 
     # plot 6 
@@ -352,7 +385,7 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
 
         plt.savefig(
             f"{out_dir}/{source}_geometry_step6_region_fits.pdf",
-            bbox_inches='tight'
+        bbox_inches='tight'
         )
 
         plt.close()
@@ -367,9 +400,9 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
         cols = ['cyan', 'lime', 'magenta']
         labels = ['Inner', 'Middle', 'Outer']
         offsets = [
-            (+10, +10),   # inner
-            (+10, -15),   # middle
-            (-20, +10),   # outer
+            (+5, +10),   # inner
+            (+5, -10),   # middle
+            (-15, +5),   # outer
         ]
         for i in range(3):
 
@@ -442,7 +475,7 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
                     y_c + dy,
                     txt,
                     color='white',
-                    fontsize=9,
+                    fontsize=FS,
                     transform=ax.get_transform("pixel"),
                     bbox=dict(
                         facecolor='black',
@@ -480,11 +513,10 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
      #   ax.set_title(
       #      f"{source}: pressure regions and Pint/Pext"
        # )
-        ax.legend()
+        ax.legend(fontsize=FS)
         plt.savefig(
-            f"{out_dir}/{source}_geometry_step7_pressure_ratios.pdf",
-            bbox_inches='tight'
-        )
+            f"{out_dir}/{source}_geometry_step7_pressure_ratios.pdf" ,
+        bbox_inches='tight' )
 
         plt.close()
 
@@ -1206,7 +1238,7 @@ def process_source(row, source_type, cache_dir, out_dir):
     area_m2 = estimate_cross_section(width_m)
     row['Cross_sectional_A (m2)'] = area_m2
 
-    # Buoyancy and ram
+    # Buoyancy and ram at ends
     V = (4 / 3) * np.pi * (width_m / 2)**3
     F_buoy = V * g * rho_ICM
     ram_pressure_force = phys["P_ram"] * area_m2
@@ -1343,6 +1375,10 @@ def process_source(row, source_type, cache_dir, out_dir):
         seg_Rr200[k] = R_over_R200
         seg_Pint[k]  = P_int
         seg_Pext[k]  = P_ext
+                    
+        row[f'Pint{i}'] = P_int
+        row[f'Pext{i}'] = P_ext
+        
         seg_ratio[k] = P_int / P_ext if (np.isfinite(P_int) and np.isfinite(P_ext) and P_ext > 0) else np.nan
         
         widths_as_deconv[k] = width_as_deconv
@@ -1352,8 +1388,9 @@ def process_source(row, source_type, cache_dir, out_dir):
         widths[i-1] = width_pix
         dirs[i-1] = (px, py)
         heights[i-1] = height_pix
-       
-        
+
+
+
         if np.isfinite(P_int) and np.isfinite(P_ext):
             row[f'Pint/Pext{i}'] = P_int / P_ext
         
@@ -1361,27 +1398,84 @@ def process_source(row, source_type, cache_dir, out_dir):
         else:
             row[f'Pint/Pext{i}'] = np.nan
 
+        # dist is the angular-diameter distance in Mpc.
+        arcsec_to_m = (
+            dist.to(u.m).value / 206265.0 #(arcec to rad 180/pi x 3600)
+        )
+
+        radius_i_m = radius_as * arcsec_to_m
+        height_i_m = height_as * arcsec_to_m
+
+        area_i_m2 = np.pi * radius_i_m**2
+
+        # Volume of the cylindrical segment.
+        volume_i_m3 = area_i_m2 * height_i_m
+
+        P_ext_i, rho_local_i, v_local_i, P_ram_i, R200_ratio_i = (
+            compute_external_at_rkpc(row, r_kpc, z)
+        )
+
+        M500_raw, _ = get_M500(row)
+
+        if (
+            np.isfinite(M500_raw)
+            and np.isfinite(r_kpc)
+            and r_kpc > 0
+            and np.isfinite(rho_local_i)
+            and rho_local_i > 0
+        ):
+            M500_i = M500_raw / h
+
+            prof_i = profile_nfw.NFWProfile(
+                M=M500_i,
+                c=conc,
+                z=z,
+                mdef="vir"
+            )
+
+            # Colossus radius is in kpc/h.
+            r_i_kpc_h = r_kpc * h
+
+            # Enclosed mass in solar masses/h.
+            m_enc_i = prof_i.enclosedMass(r_i_kpc_h)
+
+            # Convert enclosed mass to kg.
+            m_enc_i_kg = m_enc_i * M_solar / h
+
+            # Physical radius in metres.
+            r_i_m = r_kpc * 3.0856776e19
+
+            # Local gravitational acceleration (m/s^2).
+            g_i = G * m_enc_i_kg / r_i_m**2
+
+           
+            F_buoy_i = (
+                volume_i_m3 * g_i * rho_local_i
+            )
+
+        
+            F_ram_i = P_ram_i * area_i_m2
+            F_expansion_i = P_int * area_i_m2
+            
+        else:
+            g_i = np.nan
+            F_buoy_i = np.nan
+            F_ram_i = np.nan
+            F_expansion_i = np.nan
+
+       
+        row[f'F_buoy_{i}'] = F_buoy_i
+        row[f'F_ram_{i}'] = F_ram_i
+        row[f'F_expansion_{i}'] = F_expansion_i
+        
+        row[f'g_{i}'] = g_i
+        row[f'rho_ICM_{i}'] = rho_local_i
+      
+        row[f'V_segment_{i}'] = volume_i_m3
+        row[f'A_segment_{i}'] = area_i_m2
 
 
-#     row_dict = dict(
-#     Source_Name=source,
-#     Morph=source_type,
-#     z=z,
-#     M500_bcg=row.get("M500_bcg", np.nan),
 
-#     flux1=seg_flux[0], flux2=seg_flux[1], flux3=seg_flux[2],
-#     height_cyl1_arcsec=seg_h_as[0], height_cyl2_arcsec=seg_h_as[1], height_cyl3_arcsec=seg_h_as[2],
-#     radius_cyl1_arcsec=seg_r_as[0], radius_cyl2_arcsec=seg_r_as[1], radius_cyl3_arcsec=seg_r_as[2],
-
-#     r_kpc1=seg_r_kpc[0], r_kpc2=seg_r_kpc[1], r_kpc3=seg_r_kpc[2],
-#     R_over_R200_1=seg_Rr200[0], R_over_R200_2=seg_Rr200[1], R_over_R200_3=seg_Rr200[2],
-
-#     Pint1=seg_Pint[0]/1e-13, Pext1=seg_Pext[0]/1e-13, Pint_Pext1=seg_ratio[0],
-#     Pint2=seg_Pint[1]/1e-13, Pext2=seg_Pext[1]/1e-13, Pint_Pext2=seg_ratio[1],
-#     Pint3=seg_Pint[2]/1e-13, Pext3=seg_Pext[2]/1e-13, Pint_Pext3=seg_ratio[2],
-# )
-
-#     debug_rows.append(row_dict)
     make_geometry_diagnostics(row=row,  source=source, out_dir=out_dir, image=image, wcs_cutout=wcs_cutout,xnew_u=xnew_u,
                               ynew_u=ynew_u,x_pix=x_pix, y_pix=y_pix, x_host=x_host, y_host=y_host, host_idx=host_idx,
                               end_idx=end_idx, x0=x0,  y0=y0,  m_perp=m_perp, x05=x05, y05=y05, m_perp5=m_perp5,   mask=mask,
@@ -1594,10 +1688,39 @@ if __name__ == "__main__":
     new_cols = [
         'Pint1', 'Pint2', 'Pint3',
         'Pext1', 'Pext2', 'Pext3',
+        
         'Pint/Pext1',
         'Pint/Pext2',
         'Pint/Pext3',
-    ]
+        
+        'F_buoy_1',
+        'F_buoy_2',
+        'F_buoy_3',
+        
+        'F_ram_1',
+        'F_ram_2',
+        'F_ram_3',
+        
+        'F_expansion_1',
+        'F_expansion_2',
+        'F_expansion_3',
+    
+        'g_1',
+        'g_2',
+        'g_3',
+    
+        'V_segment_1',
+        'V_segment_2',
+        'V_segment_3',
+
+        'A_segment_1',
+        'A_segment_2',
+        'A_segment_3',
+        
+        'rho_ICM_1',
+        'rho_ICM_2',
+        'rho_ICM_3',
+         ]
 
 
 
@@ -1608,7 +1731,8 @@ if __name__ == "__main__":
     # Main loop
     for i, row in enumerate(table):
            
-       
+        if row["Source_Name"] != "ILTJ135720.67+400405.0":
+            continue
 
         # Skip already-processed rows 
         # if ('Pint/Pext1' in row.colnames and
@@ -1629,10 +1753,10 @@ if __name__ == "__main__":
 
 
     # Save updated table
-    out_fits = (
-        "/beegfs/lofar/lclews/FRI_evolution/subclassification/inspection_results/new_env_final_classes_with_forces_and_pressures_model3.fits"
-    )
+    # out_fits = (
+    #     "/beegfs/lofar/lclews/FRI_evolution/subclassification/inspection_results/new_env_final_classes_with_forces_and_pressures_model3_moreoutputs.fits"
+    # )
     
-    table.write(out_fits, overwrite=True)
+    # table.write(out_fits, overwrite=True)
     
-    print(f"Saved table to {out_fits}")
+    # print(f"Saved table to {out_fits}")
