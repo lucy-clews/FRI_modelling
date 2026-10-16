@@ -818,7 +818,7 @@ def compute_forces(row):
     P500 = model.calcP(R, 10**M200, z)
     P = P500 * 1.38e-17  # K/cm^3 > Pa
     ne = model.calcne(R, 10**M200, z) * 1e6  # m^-3
-    rho_ICM = 1.17 * ne * m_p
+    rho_ICM = 1.14 * ne * m_p
     gamma = 5 / 3
     v = np.sqrt((gamma * P) / rho_ICM)  # m/s
     P_ram = rho_ICM * v**2
@@ -861,7 +861,7 @@ def compute_external_at_rkpc(row, r_kpc, z):
     P_local = P500_local * 1.38e-17  # K/cm^3 to Pa conversion
 
     ne_local = model.calcne(R_over_R200, 10**M200, z) * 1e6  # work out density at r_kpc and convert to m^-3
-    rho_local = 1.17 * ne_local * m_p
+    rho_local = 1.14 * ne_local * m_p
 
     gamma = 5 / 3
     v_local = np.sqrt((gamma * P_local) / rho_local) #estimate velocity as sound speed
