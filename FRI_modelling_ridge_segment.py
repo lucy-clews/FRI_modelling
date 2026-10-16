@@ -816,7 +816,7 @@ def compute_forces(row):
 
     R = row["Size"] / R200  # dimensionless R/R200 using Size as proxy
     P500 = model.calcP(R, 10**M200, z)
-    P = P500 * 1.38e-17  # keV/cm^3 > Pa
+    P = P500 * 1.38e-17  # K/cm^3 > Pa
     ne = model.calcne(R, 10**M200, z) * 1e6  # m^-3
     rho_ICM = 1.17 * ne * m_p
     gamma = 5 / 3
@@ -858,7 +858,7 @@ def compute_external_at_rkpc(row, r_kpc, z):
     
 
     P500_local = model.calcP(R_over_R200, 10**M200, z) # work out pressure at r_kpc
-    P_local = P500_local * 1.38e-17  # keV/cm^3 to Pa conversion
+    P_local = P500_local * 1.38e-17  # K/cm^3 to Pa conversion
 
     ne_local = model.calcne(R_over_R200, 10**M200, z) * 1e6  # work out density at r_kpc and convert to m^-3
     rho_local = 1.17 * ne_local * m_p
