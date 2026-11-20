@@ -4,7 +4,7 @@
 #code to model all forces acting in/on 3 segments along LoTSS radio jets. NOTE: Has to be run a inside virtual env with cololussus and dpmhalo installed!! (i.e. do source /beegfs/lofar/lclews/NG1044/pysynch/astropy-env/bin/activate,  then python3 FRI_modelling_ridge_segment.py)
 
 #import modules 
-
+from matplotlib.patches import FancyBboxPatch
 from matplotlib.patches import Rectangle
 import matplotlib.transforms as transforms
 
@@ -67,7 +67,7 @@ h = 0.6766                   # H0/100
 G = 6.67e-11                # SI
 M_solar = 1.988e30          # kg
 
-
+KAPPA_VALUES = list(range(0, 120, 5))
 # Functions
 
 def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_u, ynew_u,  x_pix, y_pix,    x_host, y_host,host_idx,
@@ -86,11 +86,21 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
     6) step6_region_fits.pdf - shows segment geometry (widths, heights) through rectangles (couldn't plot 3d cylinder, use this as proxy)
     7) step7_pressure_ratios.pdf - shows ridge, host, 3 segments (as rectangles), pressure ratio labelled in each segment
     """
-    FS = 22
-    TICKFS = 20
-    # crop to source
-    finite_mask = np.isfinite(image)
+    # ============================================================
+# GEOMETRY DIAGNOSTIC PLOTS
+# - Reduced whitespace
+# - Step label on every plot
+# - Plot 4 colourbar separated from axes
+# - Plot 5 colourbar labelled "Segment number"
+# ============================================================
 
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    
+    FS = 16
+    TICKFS = 14
+    
+    finite_mask = np.isfinite(image)
+    
     ys_all, xs_all = np.nonzero(finite_mask)
     
     pad = 10
@@ -101,16 +111,19 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
     xmin = max(xs_all.min() - pad, 0)
     xmax = min(xs_all.max() + pad, image.shape[1])
     
+    
     def setup_axes():
     
+        fig = plt.figure(figsize=(8, 8))
     
-        fig = plt.figure(figsize=(10,10))
-        ax = fig.add_subplot(111, projection=wcs_cutout)
+        ax = fig.add_axes(
+            [0.12, 0.12, 0.72, 0.78],
+            projection=wcs_cutout
+        )
     
         vmin = np.nanpercentile(image, 5)
         vmax = np.nanpercentile(image, 99)
-        fig.subplots_adjust(left=0.12,right=0.92, bottom=0.12,top=0.95)
-        
+    
         ax.imshow(
             image,
             origin='lower',
@@ -118,11 +131,8 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
             cmap='inferno'
         )
     
-        
-    
-        ax.set_xlim(xmin,xmax)
-    
-        ax.set_ylim(ymin,ymax)
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(ymin, ymax)
     
         ax.coords[0].set_axislabel(
             "RA (J2000)",
@@ -141,28 +151,52 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
         ax.coords[1].set_ticklabel(size=TICKFS)
     
         return fig, ax
-        # plot 1
     
-
+    
+    def add_step_label(ax, step):
+    
+        ax.text(
+            0.03,
+            0.03,
+            f"Step {step}",
+            transform=ax.transAxes,
+            fontsize=FS-2,
+            color='white',
+            ha='left',
+            va='bottom',
+            bbox=dict(
+                facecolor='black',
+                alpha=0.7,
+                edgecolor='none'
+            )
+        )
+    
+    
+    # ============================================================
+    # PLOT 1
+    # ============================================================
+    
     fig, ax = setup_axes()
-
+    
     ax.plot(
-        xnew_u, ynew_u,
+        xnew_u,
+        ynew_u,
         color='black',
         lw=2,
         transform=ax.get_transform("world"),
         label='Spline'
     )
-
+    
     ax.plot(
-        x_host, y_host,
+        x_host,
+        y_host,
         marker='*',
         color='r',
         ms=15,
         transform=ax.get_transform("pixel"),
         label='Host'
     )
-
+    
     ax.plot(
         x_pix[end_idx],
         y_pix[end_idx],
@@ -171,73 +205,88 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
         transform=ax.get_transform("pixel"),
         label='Chosen end'
     )
-
+    
     ax.legend(fontsize=FS)
-   # ax.set_title(f"{source}: host and spline")
-
+    add_step_label(ax, 1)
+    
     plt.savefig(
         f"{out_dir}/{source}_geometry_step1_ridge.pdf",
-        bbox_inches='tight')
-   
-    plt.close()
-
-    # plot 2 
+        bbox_inches='tight',
+        pad_inches=0.02
+    )
     
-
+    plt.close()
+    
+    
+    # ============================================================
+    # PLOT 2
+    # ============================================================
+    
     fig, ax = setup_axes()
-
+    
     yy_mask, xx_mask = np.nonzero(mask)
-
+    
     ax.scatter(
         xx_mask,
         yy_mask,
         c='cyan',
         s=2,
         alpha=0.5,
-        transform=ax.get_transform("pixel"),label='Chosen end'
+        transform=ax.get_transform("pixel"),
+        label='Chosen side'
     )
-
+    
     ax.plot(
         xnew_u,
         ynew_u,
         color='black',
         lw=2,
-        transform=ax.get_transform("world"),label='Ridgeline spline')
-   
+        transform=ax.get_transform("world"),
+        label='Ridgeline spline'
+    )
+    
     ax.plot(
         x_host,
         y_host,
         marker='*',
         color='r',
         ms=15,
-        transform=ax.get_transform("pixel"),label='Host')
-
-    #ax.set_title(f"{source}: selected-side pixels")
+        transform=ax.get_transform("pixel"),
+        label='Host'
+    )
+    
     ax.legend(fontsize=FS)
+    add_step_label(ax, 2)
+    
     plt.savefig(
         f"{out_dir}/{source}_geometry_step2_side_selection.pdf",
-        bbox_inches='tight')
+        bbox_inches='tight',
+        pad_inches=0.02
+    )
+    
     plt.close()
-
-
-    # plot 3 
- 
-
+    
+    
+    # ============================================================
+    # PLOT 3
+    # ============================================================
+    
     fig, ax = setup_axes()
-
+    
     ax.scatter(
         xs_sel,
         ys_sel,
         c='red',
         s=3,
         alpha=0.7,
-        transform=ax.get_transform("pixel"),label='Selected pixels'
+        transform=ax.get_transform("pixel"),
+        label='Selected pixels'
     )
-
+    
     if best_pair is not None:
-
+    
         pt1, pt2 = best_pair
-
+    
         ax.plot(
             [pt1.ra.deg, pt2.ra.deg],
             [pt1.dec.deg, pt2.dec.deg],
@@ -246,22 +295,25 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
             transform=ax.get_transform("world"),
             label=f"Deconvolved width = {width_kpc_deconvolved:.1f} kpc"
         )
-
-        ax.legend(fontsize=FS)
-
-  #  ax.set_title(f"{source}: width measurement")
-
+    
+    ax.legend(fontsize=FS)
+    add_step_label(ax, 3)
+    
     plt.savefig(
         f"{out_dir}/{source}_geometry_step3_width.pdf",
-        bbox_inches='tight'
+        bbox_inches='tight',
+        pad_inches=0.02
     )
+    
     plt.close()
-
-  
-    # plot 4 
+    
+    
+    # ============================================================
+    # PLOT 4
+    # ============================================================
     
     fig, ax = setup_axes()
-    fig.subplots_adjust(right=0.82)
+    
     sc = ax.scatter(
         xs,
         ys,
@@ -270,124 +322,180 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
         s=3,
         transform=ax.get_transform("pixel")
     )
-
-    cbar=plt.colorbar(
-        sc,
-        ax=ax,
-        fraction=0.046,
-        pad=0,
-        shrink=0.85
+    
+    divider = make_axes_locatable(ax)
+    
+    cax = divider.append_axes(
+        "right",
+        size="4%",
+        pad=0.08
     )
-
-    cbar.set_label("Normalised distance along ridge",fontsize=FS)
-    cbar.ax.tick_params(labelsize=TICKFS)
-
-    #ax.set_title(f"{source}: u_ridge mapping")
-
+    
+    cbar = fig.colorbar(
+        sc,
+        cax=cax
+    )
+    
+    cbar.set_label(
+        "Normalised distance along ridge",
+        fontsize=FS
+    )
+    
+    cbar.ax.tick_params(
+        labelsize=TICKFS
+    )
+    
+    add_step_label(ax, 4)
+    
     plt.savefig(
         f"{out_dir}/{source}_geometry_step4_uridge.pdf",
-        bbox_inches='tight'
+        bbox_inches='tight',
+        pad_inches=0.02
     )
+    
     plt.close()
-
-
-    # plot 5 
-  
-
+    
+    
+    # ============================================================
+    # PLOT 5
+    # ============================================================
+    
     fig, ax = setup_axes()
-
-    cols = ['cyan','lime','magenta']
-
-    for seg_mask, col in zip(seg_masks, cols):
-
+    
+    all_x = []
+    all_y = []
+    all_seg = []
+    
+    for i, seg_mask in enumerate(seg_masks):
+    
         yy, xx = np.nonzero(seg_mask)
-
-        ax.scatter(
-            xx,
-            yy,
-            s=4,
-            c=col,
-            alpha=0.4,
-            transform=ax.get_transform("pixel")
+    
+        all_x.extend(xx)
+        all_y.extend(yy)
+    
+        all_seg.extend(
+            np.full(len(xx), i + 1)
         )
-
+    
+    sc = ax.scatter(
+        all_x,
+        all_y,
+        c=all_seg,
+        cmap='viridis',
+        s=4,
+        alpha=0.5,
+        transform=ax.get_transform("pixel")
+    )
+    
+    divider = make_axes_locatable(ax)
+    
+    cax = divider.append_axes(
+        "right",
+        size="4%",
+        pad=0.08
+    )
+    
+    cbar = fig.colorbar(
+        sc,
+        cax=cax,
+        ticks=[1, 2, 3]
+    )
+    
+    cbar.set_label(
+        "Segment number",
+        fontsize=FS
+    )
+    
+    cbar.ax.tick_params(
+        labelsize=TICKFS
+    )
+    
     ax.plot(
         x_host,
         y_host,
         marker='*',
         color='r',
         ms=15,
-        transform=ax.get_transform("pixel"),label='Host'
+        transform=ax.get_transform("pixel"),
+        label='Host'
     )
-
-  #  ax.set_title(f"{source}: pressure segments")
+    
     ax.legend(fontsize=FS)
+    
+    add_step_label(ax, 5)
+    
     plt.savefig(
         f"{out_dir}/{source}_geometry_step5_segments.pdf",
-        bbox_inches='tight')
+        bbox_inches='tight',
+        pad_inches=0.02
+    )
+    
     plt.close()
-
-    # plot 6 
- 
-
+    
+    
+    # ============================================================
+    # PLOT 6
+    # ============================================================
+    
     if centres is not None:
-
+    
         fig, ax = setup_axes()
-
-        cols = ['cyan','lime','magenta']
-
+    
+        cols = ['cyan', 'lime', 'magenta']
+    
         for i in range(3):
-
+    
             if centres[i] is None:
                 continue
-
+    
             if widths_as_deconv[i] is None:
                 continue
-
+    
             x_c, y_c = centres[i]
             px, py = dirs[i]
-
+    
             pixscale_as = abs(
                 wcs_cutout.wcs.cdelt[0]
             ) * 3600.
-
+    
             L = widths_as_deconv[i] / pixscale_as
             H = heights_as_deconv[i] / pixscale_as
-
+    
             theta = np.degrees(
                 np.arctan2(py, px)
             )
-
+    
             rect = Rectangle(
-                (x_c-L/2, y_c-H/2),
+                (x_c - L/2, y_c - H/2),
                 L,
                 H,
                 edgecolor=cols[i],
                 facecolor='none',
                 lw=2
             )
-
+    
             trans = (
                 transforms.Affine2D()
                 .rotate_deg_around(
-                    x_c, y_c, theta
+                    x_c,
+                    y_c,
+                    theta
                 )
                 + ax.get_transform("pixel")
             )
-
+    
             rect.set_transform(trans)
-
+    
             ax.add_patch(rect)
-
-      #  ax.set_title(
-        #     f"{source}: fitted pressure regions"
-        # )
-
+    
+        add_step_label(ax, 6)
+    
         plt.savefig(
             f"{out_dir}/{source}_geometry_step6_region_fits.pdf",
-        bbox_inches='tight'
+            bbox_inches='tight',
+            pad_inches=0.02
         )
-
+    
         plt.close()
         
     # plot 7
@@ -441,25 +549,31 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
                 np.arctan2(py, px)
             )
 
-            rect = Rectangle(
+            # Draw a cylindrical side-view (rounded capsule)
+            radius = min(L, H) / 2
+            
+            cylinder = FancyBboxPatch(
                 (x_c - L/2, y_c - H/2),
                 L,
                 H,
+                boxstyle=f"round,pad=0,rounding_size={radius}",
                 edgecolor=cols[i],
                 facecolor='none',
-                lw=2
+                linewidth=2
             )
-
+            
             trans = (
                 transforms.Affine2D()
                 .rotate_deg_around(
-                    x_c, y_c, theta
+                    x_c,
+                    y_c,
+                    theta
                 )
                 + ax.get_transform("pixel")
             )
-
-            rect.set_transform(trans)
-            ax.add_patch(rect)
+            
+            cylinder.set_transform(trans)
+            ax.add_patch(cylinder)
 
             Pi = row.get(f'Pint/Pext{i+1}', np.nan)
 
@@ -515,10 +629,407 @@ def make_geometry_diagnostics( row, source, out_dir,image,  wcs_cutout,    xnew_
        # )
         ax.legend(fontsize=FS)
         plt.savefig(
-            f"{out_dir}/{source}_geometry_step7_pressure_ratios.pdf" ,
-        bbox_inches='tight' )
+            f"{out_dir}/{source}_geometry_step7_pressure_ratios.pdf")
 
         plt.close()
+
+    # ============================================================
+    # SUMMARY FIGURE (2 x 3)
+    # Run AFTER all geometry quantities have been calculated
+    # Uses existing FS and TICKFS values
+    # ============================================================
+    
+    fig = plt.figure(figsize=(12,16))
+    
+    gs = fig.add_gridspec(
+        3, 2,
+        left=0.04,
+        right=0.95,
+        bottom=0.05,
+        top=0.98,
+        wspace=0.08,
+        hspace=0.08
+    )
+    
+    vmin = np.nanpercentile(image, 5)
+    vmax = np.nanpercentile(image, 99)
+    
+    titles = [
+        "Step 1: Ridgeline spline",
+        "Step 2: Side selection",
+        "Step 3: Deconvolved width measurement",
+        "Step 4: Normalised distance along the ridge",
+        "Step 5: Segmentation",
+        "Step 6: Allocate regions"
+    ]
+    
+    axes = []
+    
+    for i in range(6):
+    
+        ax = fig.add_subplot(
+            gs[i // 2, i % 2],
+            projection=wcs_cutout
+        )
+        row = i // 2
+        col = i % 2
+        ax.imshow(
+            image,
+            origin='lower',
+            norm=LogNorm(vmin=vmin, vmax=vmax),
+            cmap='inferno'
+        )
+    
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(ymin, ymax)
+    
+        if row < 2:
+
+            ax.coords[0].set_axislabel("")
+            ax.coords[0].set_ticklabel_visible(False)
+        
+        else:
+        
+            ax.coords[0].set_axislabel(
+                "RA (J2000)",
+                fontsize=int(FS )
+            )
+    
+        if col == 0:
+            ax.coords[1].set_axislabel(
+                "DEC (J2000)",
+                fontsize=int(FS)
+            )
+        else:
+            ax.coords[1].set_axislabel("")
+            ax.coords[1].set_ticklabel_visible(False)
+            
+        ax.coords[0].set_ticks_position('b')
+        ax.coords[0].set_ticklabel_position('b')
+        ax.coords[1].set_ticks_position('l')
+        ax.coords[1].set_ticklabel_position('l')
+        ax.coords[0].set_major_formatter('hh:mm:ss')
+        ax.coords[1].set_major_formatter('dd:mm:ss')
+    
+        ax.coords[0].set_ticklabel(
+            size=int(TICKFS )
+        )
+    
+        ax.coords[1].set_ticklabel(
+            size=int(TICKFS )
+        )
+    
+        ax.set_title(
+            titles[i],
+            fontsize=int(FS )
+        )
+    
+        axes.append(ax)
+    
+    ax1, ax2, ax3, ax4, ax5, ax6 = axes
+    
+    # ============================================================
+    # PANEL 1
+    # ============================================================
+    
+    ax1.plot(
+        xnew_u,
+        ynew_u,
+        color='black',
+        lw=2,
+        transform=ax1.get_transform("world"),
+        label='Spline'
+    )
+    
+    ax1.plot(
+        x_host,
+        y_host,
+        '*',
+        color='r',
+        ms=12,
+        transform=ax1.get_transform("pixel"),
+        label='Host'
+    )
+    
+    ax1.plot(
+        x_pix[end_idx],
+        y_pix[end_idx],
+        'co',
+        ms=8,
+        transform=ax1.get_transform("pixel"),
+        label='Chosen end'
+    )
+    
+    ax1.legend(
+        fontsize=int(FS),
+        loc='upper left'
+    )
+    
+    # ============================================================
+    # PANEL 2
+    # ============================================================
+    
+    yy_mask, xx_mask = np.nonzero(mask)
+    
+    ax2.scatter(
+        xx_mask,
+        yy_mask,
+        s=10,
+        c='cyan',
+        alpha=0.9,
+        transform=ax2.get_transform("pixel"),label='Chosen end'
+    )
+    
+    ax2.plot(
+        xnew_u,
+        ynew_u,
+        color='black',
+        lw=2,
+        transform=ax2.get_transform("world"),
+        label='Spline'
+    )
+    
+    ax2.plot(
+        x_host,
+        y_host,
+        '*',
+        color='r',
+        ms=12,
+        transform=ax2.get_transform("pixel"),
+        label='Host'
+    )
+    ax2.legend(
+        fontsize=int(FS),
+        loc='upper left'
+    )
+    # ============================================================
+    # PANEL 3
+    # ============================================================
+    
+    ax3.scatter(
+        xs_sel,
+        ys_sel,
+        c='cyan',
+        s=10,
+        alpha=0.9,
+        transform=ax3.get_transform("pixel"),label='Chosen end'
+    )
+    
+    if best_pair is not None:
+    
+        pt1, pt2 = best_pair
+    
+        ax3.plot(
+            [pt1.ra.deg, pt2.ra.deg],
+            [pt1.dec.deg, pt2.dec.deg],
+            color='g',
+            lw=3,
+            transform=ax3.get_transform("world"),label= f"Deconvolved width = {width_kpc_deconvolved:.1f} kpc" )
+    
+    ax3.legend(
+        fontsize=int(FS),
+        loc='upper left'
+    )
+    
+    # ============================================================
+    # PANEL 4
+    # ============================================================
+    
+    sc4 = ax4.scatter(
+        xs,
+        ys,
+        c=u_ridge,
+        cmap='viridis',
+        s=10,
+        transform=ax4.get_transform("pixel")
+    )
+    
+    cb4 = fig.colorbar(
+        sc4,
+        ax=ax4,
+        fraction=0.046,
+        pad=0.0
+    )
+    
+    cb4.set_label(
+        "Normalised distance",
+        fontsize=int(FS )
+    )
+    
+    cb4.ax.tick_params(
+        labelsize=int(TICKFS)
+    )
+    
+    # ============================================================
+    # PANEL 5
+    # ============================================================
+    
+    all_x = []
+    all_y = []
+    all_seg = []
+    from matplotlib.colors import ListedColormap, BoundaryNorm
+
+    segment_colours = ['yellow','cyan', 'magenta']
+    
+    cmap_seg = ListedColormap(segment_colours)
+    
+    norm_seg = BoundaryNorm(
+        [0.5, 1.5, 2.5, 3.5],
+        cmap_seg.N
+    )
+    for i, seg_mask in enumerate(seg_masks):
+    
+        yy, xx = np.nonzero(seg_mask)
+    
+        all_x.extend(xx)
+        all_y.extend(yy)
+        all_seg.extend(
+            np.full(len(xx), i + 1)
+        )
+    
+    sc5 = ax5.scatter(
+    all_x,
+    all_y,
+    c=all_seg,
+    cmap=cmap_seg,
+    norm=norm_seg,
+    s=10,
+    alpha=0.9,
+    transform=ax5.get_transform("pixel")
+)
+    
+    ax5.plot(
+        x_host,
+        y_host,
+        '*',
+        color='r',
+        ms=12,
+        transform=ax5.get_transform("pixel"),label='Host'
+    )
+    
+    cb5 = fig.colorbar(
+    sc5,
+    ax=ax5,
+    ticks=[1, 2, 3],
+    fraction=0.046,
+    pad=0.0
+)
+
+    cb5.ax.set_yticklabels(
+        ['1', '2', '3']
+    )
+    
+    cb5.set_label(
+        "Segment",
+        fontsize=int(FS ))
+    
+    cb5.ax.tick_params(
+        labelsize=int(TICKFS )
+    )
+    ax5.legend(
+        fontsize=int(FS ),
+        loc='upper right'
+    )
+    # ============================================================
+    # PANEL 6
+    # ============================================================
+    
+    if centres is not None:
+    
+        cols = ['yellow','cyan', 'magenta']
+    
+        for i in range(3):
+    
+            if centres[i] is None:
+                continue
+    
+            if widths_as_deconv[i] is None:
+                continue
+    
+            x_c, y_c = centres[i]
+            px, py = dirs[i]
+    
+            pixscale_as = (
+                abs(wcs_cutout.wcs.cdelt[0]) * 3600.
+            )
+    
+            L = widths_as_deconv[i] / pixscale_as
+            H = heights_as_deconv[i] / pixscale_as
+    
+            theta = np.degrees(
+                np.arctan2(py, px)
+            )
+                
+                        # Draw a cylindrical side-view (rounded capsule)
+            radius = min(L, H) / 2
+            
+            cylinder = FancyBboxPatch(
+                (x_c - L/2, y_c - H/2),
+                L,
+                H,
+                boxstyle=f"round,pad=0,rounding_size={radius}",
+                edgecolor=cols[i],
+                facecolor='none',
+                linewidth=3
+            )
+            
+            trans = (
+                transforms.Affine2D()
+                .rotate_deg_around(
+                    x_c,
+                    y_c,
+                    theta
+                )
+                + ax6.get_transform("pixel")
+            )
+            
+            cylinder.set_transform(trans)
+            ax6.add_patch(cylinder)
+    
+   
+    # ============================================================
+    # SAVE SUMMARY FIGURE
+    # ============================================================
+
+    os.makedirs(out_dir, exist_ok=True)
+
+    pdf_path = os.path.join(
+        out_dir, f"{source}_geometry_summary.pdf"
+    )
+
+    png_path = os.path.join(
+        out_dir, f"{source}_geometry_summary.png"
+    )
+
+    print("Saving summary figure...")
+    print("Output directory:", os.path.abspath(out_dir))
+    print("PDF:", pdf_path)
+    print("PNG:", png_path)
+
+    # Save the actual summary figure
+    fig.savefig(
+        pdf_path,
+        bbox_inches='tight',
+        dpi=300
+    )
+
+    fig.savefig(
+        png_path,
+        bbox_inches='tight',
+        dpi=300
+    )
+
+    # Verify that both files exist
+    print("PDF exists:", os.path.exists(pdf_path))
+    print("PNG exists:", os.path.exists(png_path))
+
+    if os.path.exists(pdf_path):
+        print("PDF size:", os.path.getsize(pdf_path), "bytes")
+
+    if os.path.exists(png_path):
+        print("PNG size:", os.path.getsize(png_path), "bytes")
+
+    plt.close(fig)
 
 def smaller_side_mask(mask_above, mask_below):
     """
@@ -1009,43 +1520,49 @@ def measure_region(seg_mask, wcs_cutout, image, dist, map_hdr,  beam_kpc, row, r
     print('radius=', radius)
     print('height=',height)
     
-    try:
-        synch_out = SynchSource(
-            type='cylinder',
-            alcyl=height, 
-            arcyl=radius, 
-            gmin=10, gmax=1e5,
-            injection=2.0,
-            cosmology=cosmo,
-            z=z,
-            spectrum='powerlaw'
-        )
-        
-        synch_out.normalize(
-            144e6,
-            flux_cyl,
-            method='equipartition',
-            brange=(1e-11, 1e-7),
-            
-        )
-    
-        P_int = synch_out.total_energy_density / 3.0
-    
-    except Exception as e:
-        print("SynchSource failed:", e)
-        print("flux:", flux_cyl)
-        print("z", z)
-        P_int = np.nan
+    # 6. Internal pressure via equipartition
 
+    P_int_by_kappa = {}
+    
+    for kappa in KAPPA_VALUES:
+    
+        try:
+            synch_out = SynchSource(
+                type='cylinder',
+                alcyl=height,
+                arcyl=radius,
+                gmin=10,
+                gmax=1e5,
+                injection=2.0,
+                cosmology=cosmo,
+                z=z,
+                spectrum='powerlaw'
+            )
+    
+            synch_out.normalize(
+                144e6,
+                flux_cyl,
+                method='equipartition',
+                brange=(1e-11, 1e-7),
+                zeta=1 + kappa
+            )
+    
+            P_int_by_kappa[kappa] = (
+                synch_out.total_energy_density / 3.0
+            )
+    
+        except Exception as e:
+            print(f"SynchSource failed for kappa={kappa}:", e)
+            P_int_by_kappa[kappa] = np.nan
     #7.  External/ram pressure locally
     print('r_kpc=', r_kpc)
     
     P_ext, rho_local, v_local, P_ram,R_over_R200 = compute_external_at_rkpc(row, r_kpc, z)
-    print('P_int=',P_int)
+    print('P_int=',P_int_by_kappa)
     print('P_ext=',P_ext)
     
         
-    return (P_int, P_ext, P_ram, flux_cyl,x_c, y_c, px, py, width_pix, height_pix,height, radius, width_as_deconv, height_as_deconv, R_over_R200)
+    return (P_int_by_kappa, P_ext, P_ram, flux_cyl,x_c, y_c, px, py, width_pix, height_pix,height, radius, width_as_deconv, height_as_deconv, R_over_R200)
 
 
 def host_index_on_ridge(ra_host, dec_host, x_ridge, y_ridge):
@@ -1317,19 +1834,17 @@ def process_source(row, source_type, cache_dir, out_dir):
     seg_r_as   = [np.nan]*3
     seg_r_kpc  = [np.nan]*3
     seg_Rr200  = [np.nan]*3
-    seg_Pint   = [np.nan]*3
+    
     seg_Pext   = [np.nan]*3
-    seg_ratio  = [np.nan]*3
-
+  
     # Compute Pint/Pext per segment
     for i, seg_mask in enumerate(seg_masks, start=1):
         k=i-1
         if np.sum(seg_mask) < 10:
             
-            row[f'Pint{i}'] = np.nan
+           
             row[f'Pext{i}'] = np.nan
 
-            row[f'Pint/Pext{i}'] = np.nan
             continue
 
         # Representative distance from host = median projection (kpc)
@@ -1362,7 +1877,7 @@ def process_source(row, source_type, cache_dir, out_dir):
         vx/= vnorm
         vy /= vnorm
          
-        P_int, P_ext, P_ram, flux,x_c, y_c, px, py, width_pix, height_pix,height_as, radius_as, width_as_deconv, height_as_deconv, R_over_R200= measure_region(seg_mask, wcs_cutout, image, dist, map_hdr,
+        P_int_by_kappa, P_ext, P_ram, flux,x_c, y_c, px, py, width_pix, height_pix,height_as, radius_as, width_as_deconv, height_as_deconv, R_over_R200= measure_region(seg_mask, wcs_cutout, image, dist, map_hdr,
                beam_kpc, row, r_kpc, z,
                x_pix, y_pix,
                xs, ys, nearest_ridge_idx, seg_id, k)
@@ -1373,13 +1888,10 @@ def process_source(row, source_type, cache_dir, out_dir):
         seg_r_as[k]  = radius_as
         seg_r_kpc[k] = r_kpc
         seg_Rr200[k] = R_over_R200
-        seg_Pint[k]  = P_int
+       
         seg_Pext[k]  = P_ext
                     
-        row[f'Pint{i}'] = P_int
         row[f'Pext{i}'] = P_ext
-        
-        seg_ratio[k] = P_int / P_ext if (np.isfinite(P_int) and np.isfinite(P_ext) and P_ext > 0) else np.nan
         
         widths_as_deconv[k] = width_as_deconv
         heights_as_deconv[k] = height_as_deconv
@@ -1391,12 +1903,6 @@ def process_source(row, source_type, cache_dir, out_dir):
 
 
 
-        if np.isfinite(P_int) and np.isfinite(P_ext):
-            row[f'Pint/Pext{i}'] = P_int / P_ext
-        
-            print('PRESSURE RATIO=', P_int / P_ext)
-        else:
-            row[f'Pint/Pext{i}'] = np.nan
 
         # dist is the angular-diameter distance in Mpc.
         arcsec_to_m = (
@@ -1405,7 +1911,8 @@ def process_source(row, source_type, cache_dir, out_dir):
 
         radius_i_m = radius_as * arcsec_to_m
         height_i_m = height_as * arcsec_to_m
-
+        width_kpc_i = 2.0 * radius_i_m / 3.0856776e19
+        length_kpc_i = height_i_m / 3.0856776e19
         area_i_m2 = np.pi * radius_i_m**2
 
         # Volume of the cylindrical segment.
@@ -1416,7 +1923,17 @@ def process_source(row, source_type, cache_dir, out_dir):
         )
 
         M500_raw, _ = get_M500(row)
+        
+        for kappa, P_int_k in P_int_by_kappa.items():
 
+            row[f'Pint{i}_k{kappa}'] = P_int_k
+        
+            row[f'Fexp{i}_k{kappa}'] = (
+                P_int_k * area_i_m2
+                if np.isfinite(P_int_k)
+                else np.nan
+            )
+            
         if (
             np.isfinite(M500_raw)
             and np.isfinite(r_kpc)
@@ -1455,187 +1972,187 @@ def process_source(row, source_type, cache_dir, out_dir):
 
         
             F_ram_i = P_ram_i * area_i_m2
-            F_expansion_i = P_int * area_i_m2
-            
+          
         else:
             g_i = np.nan
             F_buoy_i = np.nan
             F_ram_i = np.nan
-            F_expansion_i = np.nan
-
+           
        
         row[f'F_buoy_{i}'] = F_buoy_i
+        row[f'P_ram_{i}'] = P_ram_i
         row[f'F_ram_{i}'] = F_ram_i
-        row[f'F_expansion_{i}'] = F_expansion_i
         
+   
         row[f'g_{i}'] = g_i
         row[f'rho_ICM_{i}'] = rho_local_i
       
         row[f'V_segment_{i}'] = volume_i_m3
         row[f'A_segment_{i}'] = area_i_m2
 
+        row[f'width_kpc_deconv_{i}'] = width_kpc_i
+        row[f'length_kpc_{i}'] = length_kpc_i
 
-
-    make_geometry_diagnostics(row=row,  source=source, out_dir=out_dir, image=image, wcs_cutout=wcs_cutout,xnew_u=xnew_u,
-                              ynew_u=ynew_u,x_pix=x_pix, y_pix=y_pix, x_host=x_host, y_host=y_host, host_idx=host_idx,
-                              end_idx=end_idx, x0=x0,  y0=y0,  m_perp=m_perp, x05=x05, y05=y05, m_perp5=m_perp5,   mask=mask,
-                              xs_sel=xs_sel, ys_sel=ys_sel,seg_masks=seg_masks,u_ridge=u_ridge,xs=xs,ys=ys,best_pair=best_pair,
-                              width_kpc_deconvolved=width_kpc_deconvolved,centres=centres,dirs=dirs,widths_as_deconv=widths_as_deconv,
-                              heights_as_deconv=heights_as_deconv,) #make diagnostic plots
+    # make_geometry_diagnostics(row=row,  source=source, out_dir=out_dir, image=image, wcs_cutout=wcs_cutout,xnew_u=xnew_u,
+    #                           ynew_u=ynew_u,x_pix=x_pix, y_pix=y_pix, x_host=x_host, y_host=y_host, host_idx=host_idx,
+    #                           end_idx=end_idx, x0=x0,  y0=y0,  m_perp=m_perp, x05=x05, y05=y05, m_perp5=m_perp5,   mask=mask,
+    #                           xs_sel=xs_sel, ys_sel=ys_sel,seg_masks=seg_masks,u_ridge=u_ridge,xs=xs,ys=ys,best_pair=best_pair,
+    #                           width_kpc_deconvolved=width_kpc_deconvolved,centres=centres,dirs=dirs,widths_as_deconv=widths_as_deconv,
+    #                           heights_as_deconv=heights_as_deconv,) #make diagnostic plots
     
-    finite_mask = np.isfinite(image)
-    pad = 50
-    ys_all, xs_all = np.nonzero(finite_mask)
-    ymin, ymax = ys_all.min(), ys_all.max()
-    xmin, xmax = xs_all.min(), xs_all.max()
+    # finite_mask = np.isfinite(image)
+    # pad = 50
+    # ys_all, xs_all = np.nonzero(finite_mask)
+    # ymin, ymax = ys_all.min(), ys_all.max()
+    # xmin, xmax = xs_all.min(), xs_all.max()
 
-    ymin_pad = max(ymin - pad, 0)
-    ymax_pad = min(ymax + pad + 1, image.shape[0])
-    xmin_pad = max(xmin - pad, 0)
-    xmax_pad = min(xmax + pad + 1, image.shape[1])
+    # ymin_pad = max(ymin - pad, 0)
+    # ymax_pad = min(ymax + pad + 1, image.shape[0])
+    # xmin_pad = max(xmin - pad, 0)
+    # xmax_pad = min(xmax + pad + 1, image.shape[1])
     
-    try:
-        fig = plt.figure(figsize=(8, 8))
-        ax = fig.add_subplot(111, projection=wcs_cutout)
+    # try:
+    #     fig = plt.figure(figsize=(8, 8))
+    #     ax = fig.add_subplot(111, projection=wcs_cutout)
     
-        vmin = np.nanpercentile(image, 5)
-        vmax = np.nanpercentile(image, 99)
-        ax.imshow(image, origin='lower',
-                  norm=LogNorm(vmin=vmin, vmax=vmax),
-                  cmap='inferno')
+    #     vmin = np.nanpercentile(image, 5)
+    #     vmax = np.nanpercentile(image, 99)
+    #     ax.imshow(image, origin='lower',
+    #               norm=LogNorm(vmin=vmin, vmax=vmax),
+    #               cmap='inferno')
     
-        # Ridge
-        ax.plot(xnew_u, ynew_u, 'w-', lw=1.2,
-                transform=ax.get_transform("world"),
-                alpha=0.8)
+    #     # Ridge
+    #     ax.plot(xnew_u, ynew_u, 'w-', lw=1.2,
+    #             transform=ax.get_transform("world"),
+    #             alpha=0.8)
     
-        colours = ['cyan', 'lime', 'magenta']
-        labels = ['Inner third', 'Middle third', 'Outer third']
+    #     colours = ['cyan', 'lime', 'magenta']
+    #     labels = ['Inner third', 'Middle third', 'Outer third']
 
-        for i, (seg_mask, col, lab) in enumerate(zip(seg_masks, colours, labels), start=1):
-            ys_reg, xs_reg = np.nonzero(seg_mask)
-            if len(xs_reg) == 0:
-                continue
+    #     for i, (seg_mask, col, lab) in enumerate(zip(seg_masks, colours, labels), start=1):
+    #         ys_reg, xs_reg = np.nonzero(seg_mask)
+    #         if len(xs_reg) == 0:
+    #             continue
 
-             # scatter region
-            ax.scatter(xs_reg, ys_reg, s=4, c=col,
-                       transform=ax.get_transform("pixel"),
-                       alpha=0.25)
+    #          # scatter region
+    #         ax.scatter(xs_reg, ys_reg, s=4, c=col,
+    #                    transform=ax.get_transform("pixel"),
+    #                    alpha=0.25)
 
-            Pi = row[f'Pint/Pext{i}']
+    #         Pi = row[f'Pint/Pext{i}']
 
-            xm = np.nanmedian(xs_reg)
-            ym = np.nanmedian(ys_reg)
+    #         xm = np.nanmedian(xs_reg)
+    #         ym = np.nanmedian(ys_reg)
     
-            txt = f"{lab}\nΠ = nan" if not np.isfinite(Pi) else (
-                f"{lab}\nΠ = {Pi:.2f}" if 0.01 < Pi < 100 else f"{lab}\nΠ = {Pi:.1e}"
-            )
+    #         txt = f"{lab}\nΠ = nan" if not np.isfinite(Pi) else (
+    #             f"{lab}\nΠ = {Pi:.2f}" if 0.01 < Pi < 100 else f"{lab}\nΠ = {Pi:.1e}"
+    #         )
 
         
                        
-            if centres[i-1] is None:
-                continue
+    #         if centres[i-1] is None:
+    #             continue
 
-            x_c, y_c = centres[i-1]
-            px, py = dirs[i-1]
+    #         x_c, y_c = centres[i-1]
+    #         px, py = dirs[i-1]
             
             
                        
-            pixscale_as = abs(map_hdr['CDELT1']) * 3600.0
+    #         pixscale_as = abs(map_hdr['CDELT1']) * 3600.0
             
-            L = widths_as_deconv[i-1] / pixscale_as
-            H = heights_as_deconv[i-1] / pixscale_as
+    #         L = widths_as_deconv[i-1] / pixscale_as
+    #         H = heights_as_deconv[i-1] / pixscale_as
             
                         
-            # angle from perpendicular direction
-            theta = np.degrees(np.arctan2(py, px))
+    #         # angle from perpendicular direction
+    #         theta = np.degrees(np.arctan2(py, px))
             
-            rect = Rectangle(
-                (x_c - L/2, y_c - H/2),
-                L, H,
-                linewidth=2,
-                edgecolor=col,
-                facecolor='none',
-                alpha=0.9,
-            )
+    #         rect = Rectangle(
+    #             (x_c - L/2, y_c - H/2),
+    #             L, H,
+    #             linewidth=2,
+    #             edgecolor=col,
+    #             facecolor='none',
+    #             alpha=0.9,
+    #         )
             
             
-            trans = transforms.Affine2D().rotate_deg_around(x_c, y_c, theta) + ax.get_transform("pixel")
-            rect.set_transform(trans)
+    #         trans = transforms.Affine2D().rotate_deg_around(x_c, y_c, theta) + ax.get_transform("pixel")
+    #         rect.set_transform(trans)
             
-            ax.add_patch(rect)
+    #         ax.add_patch(rect)
             
      
-            ax.text(xm + 8, ym + 8,
-                    txt, fontsize=9, color='black',
-                    transform=ax.get_transform("pixel"),
-                    bbox=dict(facecolor=col, alpha=0.25,
-                              edgecolor='none', boxstyle='round,pad=0.2'))
+    #         ax.text(xm + 8, ym + 8,
+    #                 txt, fontsize=9, color='black',
+    #                 transform=ax.get_transform("pixel"),
+    #                 bbox=dict(facecolor=col, alpha=0.25,
+    #                           edgecolor='none', boxstyle='round,pad=0.2'))
 
-            ax.plot(xm, ym, 'o', color=col, ms=6, mec='k',
-                    transform=ax.get_transform("pixel"))
+    #         ax.plot(xm, ym, 'o', color=col, ms=6, mec='k',
+    #                 transform=ax.get_transform("pixel"))
             
-        ax.set_xlim(ymin_pad, ymax_pad)
-        ax.set_ylim(xmin_pad, xmax_pad)
+    #     ax.set_xlim(ymin_pad, ymax_pad)
+    #     ax.set_ylim(xmin_pad, xmax_pad)
 
-        ax.set_title(f"{source}: three equal jet segments")
-        plt.savefig(f"{out_dir}/{source}_{source_type}_three_segments_kappa0.png", dpi=150)
-        plt.close()
+    #     ax.set_title(f"{source}: three equal jet segments")
+    #     plt.savefig(f"{out_dir}/{source}_{source_type}_three_segments_kappa0.png", dpi=150)
+    #     plt.close()
     
-    except Exception as e:
-        print("Three-segment plotting failed:", e)
+    # except Exception as e:
+    #     print("Three-segment plotting failed:", e)
 
 
     
 
-    # Plotting
-    fig = plt.figure(figsize=(8, 8))
-    ax = fig.add_subplot(111, projection=wcs_cutout)
+    # # Plotting
+    # fig = plt.figure(figsize=(8, 8))
+    # ax = fig.add_subplot(111, projection=wcs_cutout)
 
-    vmin = np.nanpercentile(image, 5)
-    vmax = np.nanpercentile(image, 99)
-    ax.imshow(image, origin='lower',
-              norm=LogNorm(vmin=vmin, vmax=vmax),
-              cmap='inferno')
-    if best_pair is not None:
+    # vmin = np.nanpercentile(image, 5)
+    # vmax = np.nanpercentile(image, 99)
+    # ax.imshow(image, origin='lower',
+    #           norm=LogNorm(vmin=vmin, vmax=vmax),
+    #           cmap='inferno')
+    # if best_pair is not None:
         
-        pt1, pt2 = best_pair
+    #     pt1, pt2 = best_pair
        
-        center_coord = SkyCoord(
-            ra=(pt1.ra.deg + pt2.ra.deg) / 2 * u.deg,
-            dec=(pt1.dec.deg + pt2.dec.deg) / 2 * u.deg
-        )
-        ax.plot(
-            [pt1.ra.deg, pt2.ra.deg],
-            [pt1.dec.deg, pt2.dec.deg],
-            color='cyan', linewidth=2,
-            alpha=0.7,
-            transform=ax.get_transform("world"),
-            label=f"Deconvolved lobe width = {width_kpc_deconvolved:.1f} kpc"
-        )
-        radius_kpc = np.sqrt(area_m2 / np.pi) / 3.086e19  # m→kpc
-        ang_radius = (radius_kpc / dist.value / 1e3) * (180 / np.pi)  # deg (small-angle)
-        circle = Circle(
-            (center_coord.ra.deg, center_coord.dec.deg),
-            ang_radius,
-            edgecolor='blue',
-            facecolor='none',
-            linewidth=1.5,
-            alpha=0.7,
-            transform=ax.get_transform("world"),
-            label="Deconvolved  area"
-        )
-        ax.add_patch(circle)
+    #     center_coord = SkyCoord(
+    #         ra=(pt1.ra.deg + pt2.ra.deg) / 2 * u.deg,
+    #         dec=(pt1.dec.deg + pt2.dec.deg) / 2 * u.deg
+    #     )
+    #     ax.plot(
+    #         [pt1.ra.deg, pt2.ra.deg],
+    #         [pt1.dec.deg, pt2.dec.deg],
+    #         color='cyan', linewidth=2,
+    #         alpha=0.7,
+    #         transform=ax.get_transform("world"),
+    #         label=f"Deconvolved lobe width = {width_kpc_deconvolved:.1f} kpc"
+    #     )
+    #     radius_kpc = np.sqrt(area_m2 / np.pi) / 3.086e19  # m→kpc
+    #     ang_radius = (radius_kpc / dist.value / 1e3) * (180 / np.pi)  # deg (small-angle)
+    #     circle = Circle(
+    #         (center_coord.ra.deg, center_coord.dec.deg),
+    #         ang_radius,
+    #         edgecolor='blue',
+    #         facecolor='none',
+    #         linewidth=1.5,
+    #         alpha=0.7,
+    #         transform=ax.get_transform("world"),
+    #         label="Deconvolved  area"
+    #     )
+    #     ax.add_patch(circle)
 
-    ax.plot(xnew_u, ynew_u, color='k', linewidth=1.5,
-            transform=ax.get_transform("world"), label='ridge', alpha=0.7)
-    ax.scatter(xs_sel, ys_sel, s=2, c='red',
-               transform=ax.get_transform("pixel"), label='selected points', alpha=0.7)
-    plt.xlim(ymin_pad, ymax_pad)  # (kept as in your code)
-    plt.ylim(xmin_pad, xmax_pad)
-    plt.legend()
-    plt.savefig(f"{out_dir}/{source}_{source_type}_area_5rms.png", bbox_inches="tight")
-    plt.close()
+    # ax.plot(xnew_u, ynew_u, color='k', linewidth=1.5,
+    #         transform=ax.get_transform("world"), label='ridge', alpha=0.7)
+    # ax.scatter(xs_sel, ys_sel, s=2, c='red',
+    #            transform=ax.get_transform("pixel"), label='selected points', alpha=0.7)
+    # plt.xlim(ymin_pad, ymax_pad)  # (kept as in your code)
+    # plt.ylim(xmin_pad, xmax_pad)
+    # plt.legend()
+    # plt.savefig(f"{out_dir}/{source}_{source_type}_area_5rms.png", bbox_inches="tight")
+    # plt.close()
 
     # Global internal expansion pressure (unchanged)
     selected_sum = np.nansum(selected_pixels)
@@ -1661,7 +2178,7 @@ def process_source(row, source_type, cache_dir, out_dir):
 #main
 
 if __name__ == "__main__":
-    in_fits = ('/beegfs/lofar/lclews/FRI_evolution/subclassification/inspection_results/new_env_final_classes_with_forces_and_pressures.fits')
+    in_fits = ('/beegfs/lofar/lclews/FRI_evolution/subclassification/inspection_results/new_env_final_classes_with_forces_and_pressures_model3.fits')
     with fits.open(in_fits) as hdu:
         data = hdu[1].data
     table = Table(data)
@@ -1683,15 +2200,22 @@ if __name__ == "__main__":
             table[col] = np.full(len(table), np.nan)
 
     
-   
+    for kappa in KAPPA_VALUES:
+        for i in range(1, 4):
     
+            for col in [
+                f'Pint{i}_k{kappa}',
+                f'Fexp{i}_k{kappa}'
+            ]:
+    
+                if col not in table.colnames:
+                    table[col] = np.full(len(table), np.nan)
+        
     new_cols = [
-        'Pint1', 'Pint2', 'Pint3',
+       
+        'P_ram_1','P_ram_2','P_ram_3',
         'Pext1', 'Pext2', 'Pext3',
         
-        'Pint/Pext1',
-        'Pint/Pext2',
-        'Pint/Pext3',
         
         'F_buoy_1',
         'F_buoy_2',
@@ -1700,14 +2224,19 @@ if __name__ == "__main__":
         'F_ram_1',
         'F_ram_2',
         'F_ram_3',
-        
-        'F_expansion_1',
-        'F_expansion_2',
-        'F_expansion_3',
-    
+   
         'g_1',
         'g_2',
         'g_3',
+        
+        'width_kpc_deconv_1',
+        'width_kpc_deconv_2',
+        'width_kpc_deconv_3',
+
+        'length_kpc_1',
+        'length_kpc_2',
+        'length_kpc_3',
+
     
         'V_segment_1',
         'V_segment_2',
@@ -1730,7 +2259,9 @@ if __name__ == "__main__":
 
     # Main loop
     for i, row in enumerate(table):
-      
+        
+     
+        
         # Skip already-processed rows 
         # if ('Pint/Pext1' in row.colnames and
         #     np.isfinite(row['Pint/Pext1']) and (row['Pint/Pext1'] != 0)):
@@ -1749,11 +2280,8 @@ if __name__ == "__main__":
             process_source(row, source_type, cache_dir, out_dir)
 
 
-    # Save updated table
-    # out_fits = (
-    #     "/beegfs/lofar/lclews/FRI_evolution/subclassification/inspection_results/new_env_final_classes_with_forces_and_pressures_model3_moreoutputs.fits"
-    # )
+    # # Save updated table
+    out_fits = ( "/beegfs/lofar/lclews/FRI_evolution/subclassification/inspection_results/FRIs_envs_forces_geom.fits")
     
-    # table.write(out_fits, overwrite=True)
-    
-    # print(f"Saved table to {out_fits}")
+    table.write(out_fits, overwrite=True)
+    print(f"Saved table to {out_fits}")
