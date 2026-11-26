@@ -1309,8 +1309,27 @@ def compute_forces(row):
     L = row["L_144"]
     L_to_P = 1e38 / 3e27  # Hardcastle+2018 Eq. 22 
     jet_power = L * L_to_P
-    row['Jet_power [W]'] = jet_power
+    row['Jet_power_Hard [W]'] = jet_power
 
+    
+    # --------------------------------------------------
+    # Cavagnolo et al. (2010)
+    # --------------------------------------------------
+    
+    L144 = row["L_144"]   # W Hz^-1
+    
+    alpha = 0.5
+    
+    L1400 = L144 * (1400.0/144.0)**(-alpha)
+    
+    P1400 = L1400 / 1e24
+    
+    logQ = 0.75 * np.log10(P1400) + 1.91
+    
+    jet_power = (10**logQ) * 1e35   # W
+    
+    row['Jet_power_Cav [W]'] = jet_power
+   
     # NFW-derived at outer radius 
     prof = profile_nfw.NFWProfile(M=M500, c=conc, z=z, mdef="vir")
     r = np.arange(0.1, size, 5)  # kpc/h
@@ -1352,7 +1371,7 @@ def compute_external_at_rkpc(row, r_kpc, z):
 
     if not np.isfinite(M500_raw):
         print(f"No valid M500 for {row['Source_Name']}")
-        return (np.nan, np.nan, np.nan, np.nan)
+        return ( np.nan,  np.nan, np.nan,  np.nan, np.nan)
     
    
     
@@ -1992,167 +2011,98 @@ def process_source(row, source_type, cache_dir, out_dir):
 
         row[f'width_kpc_deconv_{i}'] = width_kpc_i
         row[f'length_kpc_{i}'] = length_kpc_i
+                
+        # MOMENTUM FLUX in outer SEGMENT 3, for p balance and using Pint/Pext
+       
+        
+    try:
 
-    # make_geometry_diagnostics(row=row,  source=source, out_dir=out_dir, image=image, wcs_cutout=wcs_cutout,xnew_u=xnew_u,
+        V3 = row['V_segment_3']
+        Pext3 = row['Pext3']
+    
+        if (
+            np.isfinite(V3)
+            and np.isfinite(Pext3)
+            and V3 > 0
+        ):
+    
+            v_adv = 0.015 * const.c.value
+    
+            r3_kpc = seg_r_kpc[2]
+    
+            source_length_m = r3_kpc * 3.0856776e19
+    
+            t_age = source_length_m / v_adv
+    
+            row['t_age'] = t_age
+    
+            E_lobe_bal = 4.0 * Pext3 * V3
+    
+            P_lobe_bal = E_lobe_bal / t_age
+    
+            Q_bal = row['Jet_power_Cav [W]'] - P_lobe_bal
+    
+            row['E_lobe_bal'] = E_lobe_bal
+            row['P_lobe_bal'] = P_lobe_bal
+    
+            row['F_m_bal'] = (
+                Q_bal / v_adv
+                if Q_bal > 0
+                else np.nan
+            )
+    
+            Pint3 = row['Pint3_k0']
+    
+            if (
+                np.isfinite(Pint3)
+                and Pext3 > 0.
+            ):
+    
+                Pi3 = Pint3 / Pext3
+    
+                row['PintPext3'] = Pi3
+    
+                E_lobe_meas = (
+                    (3.0 * Pi3 + 1.0)
+                    * Pext3
+                    * V3
+                )
+    
+                P_lobe_meas = E_lobe_meas / t_age
+    
+                Q_meas = (
+                    row['Jet_power_Cav [W]']
+                    - P_lobe_meas
+                )
+    
+                row['E_lobe_meas'] = E_lobe_meas
+                row['P_lobe_meas'] = P_lobe_meas
+    
+                row['F_m_meas'] = (
+                    Q_meas / v_adv
+                    if Q_meas > 0
+                    else np.nan
+                )
+            else:
+                row['PintPext3'] = np.nan
+                row['E_lobe_meas'] = np.nan
+                row['P_lobe_meas'] = np.nan
+                row['F_m_meas'] = np.nan
+    except Exception as e:
+    
+        print(
+            "Momentum-flux correction failed:",
+            row['Source_Name'],
+            e
+        )
+# make_geometry_diagnostics(row=row,  source=source, out_dir=out_dir, image=image, wcs_cutout=wcs_cutout,xnew_u=xnew_u,
     #                           ynew_u=ynew_u,x_pix=x_pix, y_pix=y_pix, x_host=x_host, y_host=y_host, host_idx=host_idx,
     #                           end_idx=end_idx, x0=x0,  y0=y0,  m_perp=m_perp, x05=x05, y05=y05, m_perp5=m_perp5,   mask=mask,
     #                           xs_sel=xs_sel, ys_sel=ys_sel,seg_masks=seg_masks,u_ridge=u_ridge,xs=xs,ys=ys,best_pair=best_pair,
     #                           width_kpc_deconvolved=width_kpc_deconvolved,centres=centres,dirs=dirs,widths_as_deconv=widths_as_deconv,
-    #                           heights_as_deconv=heights_as_deconv,) #make diagnostic plots
-    
-    # finite_mask = np.isfinite(image)
-    # pad = 50
-    # ys_all, xs_all = np.nonzero(finite_mask)
-    # ymin, ymax = ys_all.min(), ys_all.max()
-    # xmin, xmax = xs_all.min(), xs_all.max()
-
-    # ymin_pad = max(ymin - pad, 0)
-    # ymax_pad = min(ymax + pad + 1, image.shape[0])
-    # xmin_pad = max(xmin - pad, 0)
-    # xmax_pad = min(xmax + pad + 1, image.shape[1])
-    
-    # try:
-    #     fig = plt.figure(figsize=(8, 8))
-    #     ax = fig.add_subplot(111, projection=wcs_cutout)
-    
-    #     vmin = np.nanpercentile(image, 5)
-    #     vmax = np.nanpercentile(image, 99)
-    #     ax.imshow(image, origin='lower',
-    #               norm=LogNorm(vmin=vmin, vmax=vmax),
-    #               cmap='inferno')
-    
-    #     # Ridge
-    #     ax.plot(xnew_u, ynew_u, 'w-', lw=1.2,
-    #             transform=ax.get_transform("world"),
-    #             alpha=0.8)
-    
-    #     colours = ['cyan', 'lime', 'magenta']
-    #     labels = ['Inner third', 'Middle third', 'Outer third']
-
-    #     for i, (seg_mask, col, lab) in enumerate(zip(seg_masks, colours, labels), start=1):
-    #         ys_reg, xs_reg = np.nonzero(seg_mask)
-    #         if len(xs_reg) == 0:
-    #             continue
-
-    #          # scatter region
-    #         ax.scatter(xs_reg, ys_reg, s=4, c=col,
-    #                    transform=ax.get_transform("pixel"),
-    #                    alpha=0.25)
-
-    #         Pi = row[f'Pint/Pext{i}']
-
-    #         xm = np.nanmedian(xs_reg)
-    #         ym = np.nanmedian(ys_reg)
-    
-    #         txt = f"{lab}\nΠ = nan" if not np.isfinite(Pi) else (
-    #             f"{lab}\nΠ = {Pi:.2f}" if 0.01 < Pi < 100 else f"{lab}\nΠ = {Pi:.1e}"
-    #         )
-
-        
-                       
-    #         if centres[i-1] is None:
-    #             continue
-
-    #         x_c, y_c = centres[i-1]
-    #         px, py = dirs[i-1]
-            
-            
-                       
-    #         pixscale_as = abs(map_hdr['CDELT1']) * 3600.0
-            
-    #         L = widths_as_deconv[i-1] / pixscale_as
-    #         H = heights_as_deconv[i-1] / pixscale_as
-            
-                        
-    #         # angle from perpendicular direction
-    #         theta = np.degrees(np.arctan2(py, px))
-            
-    #         rect = Rectangle(
-    #             (x_c - L/2, y_c - H/2),
-    #             L, H,
-    #             linewidth=2,
-    #             edgecolor=col,
-    #             facecolor='none',
-    #             alpha=0.9,
-    #         )
-            
-            
-    #         trans = transforms.Affine2D().rotate_deg_around(x_c, y_c, theta) + ax.get_transform("pixel")
-    #         rect.set_transform(trans)
-            
-    #         ax.add_patch(rect)
-            
-     
-    #         ax.text(xm + 8, ym + 8,
-    #                 txt, fontsize=9, color='black',
-    #                 transform=ax.get_transform("pixel"),
-    #                 bbox=dict(facecolor=col, alpha=0.25,
-    #                           edgecolor='none', boxstyle='round,pad=0.2'))
-
-    #         ax.plot(xm, ym, 'o', color=col, ms=6, mec='k',
-    #                 transform=ax.get_transform("pixel"))
-            
-    #     ax.set_xlim(ymin_pad, ymax_pad)
-    #     ax.set_ylim(xmin_pad, xmax_pad)
-
-    #     ax.set_title(f"{source}: three equal jet segments")
-    #     plt.savefig(f"{out_dir}/{source}_{source_type}_three_segments_kappa0.png", dpi=150)
-    #     plt.close()
-    
-    # except Exception as e:
-    #     print("Three-segment plotting failed:", e)
+    #                           heights_as_deconv=heights_as_deconv,) #make diagnostic plot
 
 
-    
-
-    # # Plotting
-    # fig = plt.figure(figsize=(8, 8))
-    # ax = fig.add_subplot(111, projection=wcs_cutout)
-
-    # vmin = np.nanpercentile(image, 5)
-    # vmax = np.nanpercentile(image, 99)
-    # ax.imshow(image, origin='lower',
-    #           norm=LogNorm(vmin=vmin, vmax=vmax),
-    #           cmap='inferno')
-    # if best_pair is not None:
-        
-    #     pt1, pt2 = best_pair
-       
-    #     center_coord = SkyCoord(
-    #         ra=(pt1.ra.deg + pt2.ra.deg) / 2 * u.deg,
-    #         dec=(pt1.dec.deg + pt2.dec.deg) / 2 * u.deg
-    #     )
-    #     ax.plot(
-    #         [pt1.ra.deg, pt2.ra.deg],
-    #         [pt1.dec.deg, pt2.dec.deg],
-    #         color='cyan', linewidth=2,
-    #         alpha=0.7,
-    #         transform=ax.get_transform("world"),
-    #         label=f"Deconvolved lobe width = {width_kpc_deconvolved:.1f} kpc"
-    #     )
-    #     radius_kpc = np.sqrt(area_m2 / np.pi) / 3.086e19  # m→kpc
-    #     ang_radius = (radius_kpc / dist.value / 1e3) * (180 / np.pi)  # deg (small-angle)
-    #     circle = Circle(
-    #         (center_coord.ra.deg, center_coord.dec.deg),
-    #         ang_radius,
-    #         edgecolor='blue',
-    #         facecolor='none',
-    #         linewidth=1.5,
-    #         alpha=0.7,
-    #         transform=ax.get_transform("world"),
-    #         label="Deconvolved  area"
-    #     )
-    #     ax.add_patch(circle)
-
-    # ax.plot(xnew_u, ynew_u, color='k', linewidth=1.5,
-    #         transform=ax.get_transform("world"), label='ridge', alpha=0.7)
-    # ax.scatter(xs_sel, ys_sel, s=2, c='red',
-    #            transform=ax.get_transform("pixel"), label='selected points', alpha=0.7)
-    # plt.xlim(ymin_pad, ymax_pad)  # (kept as in your code)
-    # plt.ylim(xmin_pad, xmax_pad)
-    # plt.legend()
-    # plt.savefig(f"{out_dir}/{source}_{source_type}_area_5rms.png", bbox_inches="tight")
-    # plt.close()
 
     # Global internal expansion pressure (unchanged)
     selected_sum = np.nansum(selected_pixels)
@@ -2191,7 +2141,8 @@ if __name__ == "__main__":
 
     # Ensure required columns exist (do not overwrite existing values)
     base_cols_with_nan = [
-        'Cross_sectional_A (m2)', 'Jet_power [W]', 'Flux (Jy)', 'F_buoy', 'F_ram',
+        'Cross_sectional_A (m2)', 'Jet_power_Hard [W]','Jet_power_Cav [W]', 't_age', 'E_lobe_bal', 'P_lobe_bal', 'F_m_bal', 
+        'Flux (Jy)', 'F_buoy', 'F_ram',
         'F_momentum', 'F_m', 'F_expansion', 'P_ram', 'P_int',
         'width_kpc', 'width_kpc_deconvolved', 'width_m', 'rho_ICM', 'v_lobe ms-1'
     ]
@@ -2210,13 +2161,19 @@ if __name__ == "__main__":
     
                 if col not in table.colnames:
                     table[col] = np.full(len(table), np.nan)
-        
+
     new_cols = [
        
         'P_ram_1','P_ram_2','P_ram_3',
         'Pext1', 'Pext2', 'Pext3',
-        
-        
+        'E_lobe_bal',
+        'F_m_bal',
+        't_age',
+        'PintPext3',
+        'E_lobe_meas',
+        'P_lobe_meas',
+        'F_m_meas',
+
         'F_buoy_1',
         'F_buoy_2',
         'F_buoy_3',
@@ -2224,7 +2181,8 @@ if __name__ == "__main__":
         'F_ram_1',
         'F_ram_2',
         'F_ram_3',
-   
+        'P_lobe_bal',
+
         'g_1',
         'g_2',
         'g_3',
